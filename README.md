@@ -85,8 +85,9 @@
    - Выходим из MySQL, Дальнейший вход возможен по команде:
    `mysql -u root -p`
    - Создаем нового пользователя и прописываем ему все права:
-   `mysql>CREATE USER 'developer'@'localhost' IDENTIFIED BY 'password';` 
-   `mysql>GRANT ALL PRIVILEGES ON *.* TO 'developer'@'localhost' WITH GRANT OPTION;`
+   `mysql>CREATE USER 'developer'@'localhost' IDENTIFIED BY 'password';` - создаем нового пользователя
+   `mysql>CREATE DATABASE db_example` - создаем новую БД
+   `mysql>GRANT ALL PRIVILEGES ON db_example.* TO 'developer'@'localhost' WITH GRANT OPTION;` - приписываем ему все полномочия над базой данных
    - Проверяем mysql и запускаем, если она не запущена
     `systemctl status mysql.service` - В окне должна быть отметка про активность службы, 
     если служба не активна запускаем:
@@ -96,7 +97,53 @@
    
 
 ## Деплой приложения на сервер
-
+ 4.1. Создание и регистрация ключей ssh
+ 
+  - Создаем ключи на локальном компьютере:
+  `ssh-keygen` - производит генерацию ключей по пути ~/.ssh/id_rsa.pub
+  
+   - На сервере создаем директорию:
+    `~/.ssh` и в ней создаем файл `touch ~/.ssh/authorized_keys`
+    
+   - Проверяем уровни доступа для директории:
+    `ls -la ~/.ssh/authorized_keys`
+   - Настраиваем необходимые уровни доступа для директорий:
+   `chmod 700 ~/.ssh` - для папки ssh
+   `chmod 600 ~/.ssh/authorized_keys` - для файла authorized_keys
+   - Копируем файл ~/.ssh/id_rsa.pub на сервер
+   `scp ~/.ssh/id_rsa.pub developer@192.168.2.113:~/.ssh/authorized_keys` !!! Не точно
+   - !!! Упрощенный вариант: 
+   `ssh-copy-id user@host` - программа самостоятельно создает требуемые дирректории на сервере и копирует ключи
+   с этого момента возможен вход на виртуальную машину без ввода логина и пароля
+   
+ 4.2. Изменяем application.properties на настройки сервера
+ 
+   - Создаем файл application-dev.properties и копируем туда все настройки. 
+   теперь запуст девелоперских настроек возможен через запуск VM с указанием профиля
+   VM options: `-Dspring.profiles.active="dev"`
+   - Настраиваем application.properties под параметры сервера
+  - Если в системе есть тесты, следует перенастроить тесты на девелоперский профиль, 
+  Во всех тестах устанавливаем профили:
+  `@ActiveProfiles({"dev"});` иначе сборка упадет на этапе тестирования   
+   
+ 4.3. Пишем скрипт деплоя
+  - Создаем файл скрипта по пути `/scripts/deploy.sh`
+  подробнее про написание [bash скриптов](https://habr.com/ru/company/ruvds/blog/325522/)
+  - Пишем скрипт запуска maven
+  `mvn clean package` - Упаковка файла в архив jar
+  - Прописываем скрипт копирования файла
+  `scp target/web-development_virtual-server-deploy-0.0.1-SNAPSHOT.jar \
+      developer@192.168.2.113:~/`
+  - Записываем скрипт перезапуска сервера
+  `ssh developer@192.168.2.113 << EOF
+       pgrep java | xargs kill -9 - убивает все java процессы
+       nohup java -jar web-development_virtual-server-deploy-0.0.1-SNAPSHOT.jar > log.txt &
+       запуск сервера и логирование в файл log.txt
+   EOF`    
+      
+  
+  
+  
 ## Плагины maven для автоматического деплоя на сервер
 
 ##
